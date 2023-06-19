@@ -23,6 +23,7 @@ class InfoMessage:
         return self.MESSAGE.format(**asdict(self))
 
 
+@dataclass
 class Training:
     """Базовый класс тренировки."""
     LEN_STEP = 0.65
@@ -49,8 +50,7 @@ class Training:
 
     def get_mean_speed(self) -> float:
         """Получить среднюю скорость движения."""
-        distance = self.get_distance()
-        return distance / self.duration
+        return self.get_distance() / self.duration
 
     def get_spent_calories(self) -> float:
         """Получить количество затраченных калорий."""
@@ -60,29 +60,32 @@ class Training:
         )
 
 
+@dataclass
 class Running(Training):
     """Тренировка: бег."""
     CALORIES_MEAN_SPEED_MULTIPLIER = 18
     CALORIES_MEAN_SPEED_SHIFT = 1.79
 
+    def __init__(self, action: int, duration: float, weight: float) -> None:
+        super().__init__(action, duration, weight)
+
     def get_spent_calories(self) -> float:
         duration_minutes = self.duration * self.MIN_IN_H
-        mean_speed = self.get_mean_speed()
         calories = (
-            (self.CALORIES_MEAN_SPEED_MULTIPLIER * mean_speed
+            (self.CALORIES_MEAN_SPEED_MULTIPLIER * self.get_mean_speed()
              + self.CALORIES_MEAN_SPEED_SHIFT)
             * self.weight / self.M_IN_KM * duration_minutes
         )
         return calories
 
 
+@dataclass
 class SportsWalking(Training):
     """Тренировка: спортивная ходьба."""
-    KONST_1 = 0.035
-    M = 100
-    KONST_2 = 0.029
-    KONST_3 = 60
-    KM_H = 0.278
+    GRAVITY_CONSTANT = 0.035
+    WEIGHT_CONSTANT = 100
+    SPEED_CONSTANT = 0.029
+    SPEED_CONVERSION_CONSTANT = 0.278
 
     def __init__(self,
                  action: int,
@@ -94,15 +97,16 @@ class SportsWalking(Training):
         self.height = height
 
     def get_spent_calories(self) -> float:
-        spid_km_h = self.get_mean_speed()
-        spid_m_s = spid_km_h * self.KM_H
+        spid_m_s = self.get_mean_speed() * self.SPEED_CONVERSION_CONSTANT
         calories = (
-            self.KONST_1 * self.weight
-            + (spid_m_s ** 2 / (self.height / self.M))
-            * self.KONST_2 * self.weight) * self.duration * self.KONST_3
+            self.GRAVITY_CONSTANT * self.weight
+            + (spid_m_s ** 2 / (self.height / self.WEIGHT_CONSTANT))
+            * self.SPEED_CONSTANT * self.weight
+        ) * self.duration * self.MIN_IN_H
         return calories
 
 
+@dataclass
 class Swimming(Training):
     """Тренировка: плавание."""
     LEN_STEP = 1.38
@@ -145,8 +149,7 @@ def read_package(workout_type: str, data: List[float]) -> Training:
 
     if workout_type in workout_classes:
         return workout_classes[workout_type](*data)
-    else:
-        raise ValueError("Unknown workout type: {}".format(workout_type))
+    raise ValueError("Unknown workout type: {}".format(workout_type))
 
 
 def main(training: Training) -> None:
